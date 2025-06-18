@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'services/auth_service.dart';
 import 'services/role_service.dart';
 import 'services/dashboard_service.dart';
@@ -19,9 +20,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/metadata_rules_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/recipient_upload_screen.dart';
+import 'screens/viewer_dashboard_screen.dart';
+import 'screens/support_us_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化Stripe
+  Stripe.publishableKey = 'YOUR_STRIPE_PUBLISHABLE_KEY';
+
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
@@ -261,6 +268,15 @@ class _HomePageState extends State<HomePage> {
                   icon: Icon(Icons.upload),
                   label: 'Upload',
                 ),
+              ] else if (user.role == 'viewer') ...[
+                const NavigationDestination(
+                  icon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                const NavigationDestination(
+                  icon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
               ] else ...[
                 const NavigationDestination(
                   icon: Icon(Icons.dashboard),
@@ -303,12 +319,19 @@ class _HomePageState extends State<HomePage> {
       if (index == 1) {
         return const RecipientUploadScreen();
       }
+    } else if (user.role == 'viewer') {
+      if (index == 0) {
+        return const ViewerDashboardScreen();
+      }
+      if (index == 1) {
+        return const SupportUsScreen();
+      }
     } else {
       if (index == 0) {
         return const DashboardScreen();
       }
       if (index == 1) {
-        return const ProfileScreen();
+        return const SupportUsScreen();
       }
     }
     return const Center(child: Text('Page Placeholder'));
