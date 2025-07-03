@@ -1,0 +1,17 @@
+name: CI/CD for 3A
+
+on:
+  push:
+    paths:
+      - '3A/**'
+
+jobs:
+  check-3A:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: List 3A contents
+        run: |
+          echo '--- 3A ---'
+          ls -R 3A || echo '3A not found' 
