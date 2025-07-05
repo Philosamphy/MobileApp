@@ -1,0 +1,9 @@
+This is a test file to demonstrate the CI/CD automatic upload functionality.
+
+When this file is pushed to GitHub, the CI/CD workflow will automatically upload it to the 1B folder.
+
+File information:
+- Creation time: $(date)
+- Purpose: Test CI/CD workflow
+- Target location: 1B/sample_file.txt
+- Status: Ready for upload 
