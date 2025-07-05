@@ -1,0 +1,33 @@
+name: Upload and Merge to 3A
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'test/**'
+  workflow_dispatch:
+
+jobs:
+  upload-to-3a:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Copy files from test to 3A (merge and overwrite)
+      run: |
+        mkdir -p 3A
+        cp -rf test/* 3A/
+        echo "Files from test merged into 3A"
+        ls -la 3A/
+
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add 3A/
+        git commit -m "Merge test folder into 3A via CI/CD" || echo "No changes to commit"
+        git push 
