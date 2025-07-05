@@ -1,4 +1,4 @@
-name: CI/CD for 1B
+name: CI/CD for 3A
 
 on:
   push:
