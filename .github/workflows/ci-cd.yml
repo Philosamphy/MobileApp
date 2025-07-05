@@ -1,0 +1,17 @@
+name: CI/CD for 1B
+
+on:
+  push:
+    paths:
+      - '1B/**'
+
+jobs:
+  check-1B:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: List 1B contents
+        run: |
+          echo '--- 1B ---'
+          ls -R 1B || echo '1B not found' 
