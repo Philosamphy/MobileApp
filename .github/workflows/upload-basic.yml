@@ -19,10 +19,7 @@ jobs:
     
     - name: Create 1B directory and copy files
       run: |
-        # Create 1B directory if it doesn't exist
         mkdir -p 1B
-        
-        # Copy all contents from test folder to 1B folder
         if [ -d "test" ]; then
           cp -r test/* 1B/
           echo "Files copied from test to 1B folder"
@@ -33,11 +30,8 @@ jobs:
     
     - name: Commit and push changes
       run: |
-        # Configure Git
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        
-        # Add, commit and push changes
         git add 1B/
         git commit -m "Upload files from test to 1B folder via CI/CD" || echo "No changes to commit"
         git push 
