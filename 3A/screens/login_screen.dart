@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
-import '../utils/validators.dart';
+import 'viewer_dashboard_screen.dart';
 
-/// 登录界面
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -12,295 +11,168 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isLogin = true;
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo和标题
-                  Icon(
-                    Icons.account_circle,
-                    size: 80,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _isLogin ? '欢迎回来' : '创建账户',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isLogin ? '请登录您的账户' : '请填写以下信息创建账户',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
+      body: Consumer<AuthService>(
+        builder: (context, authService, _) {
+          _isLoading = authService.isLoading;
 
-                  // 邮箱输入框
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: '邮箱地址',
-                      prefixIcon: Icon(Icons.email),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: Validators.validateEmail,
-                  ),
-                  const SizedBox(height: 16),
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.blue.shade800, Colors.blue.shade500],
+              ),
+            ),
+            child: Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.security, size: 80, color: Colors.white),
+                      const SizedBox(height: 24),
 
-                  // 密码输入框
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: '密码',
-                      prefixIcon: const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
+                      const Text(
+                        'Digital Certificate Repository',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
                       ),
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: Validators.validatePassword,
-                  ),
-                  const SizedBox(height: 24),
+                      const SizedBox(height: 8),
 
-                  // 登录/注册按钮
-                  Consumer<AuthService>(
-                    builder: (context, authService, child) {
-                      return ElevatedButton(
-                        onPressed: authService.isLoading ? null : _handleSubmit,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                      const Text(
+                        'Securely manage and share your digital certificates',
+                        style: TextStyle(fontSize: 16, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 48),
+
+                      Card(
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: authService.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Welcome',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              )
-                            : Text(
-                                _isLogin ? '登录' : '注册',
-                                style: const TextStyle(fontSize: 16),
                               ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                              const SizedBox(height: 24),
 
-                  // 错误信息显示
-                  Consumer<AuthService>(
-                    builder: (context, authService, child) {
-                      if (authService.error != null) {
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red[200]!),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isLoading
+                                      ? null
+                                      : () => _handleGoogleSignIn(context),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 24,
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: Colors.black87,
+                                  ),
+                                  icon: _isLoading
+                                      ? Container(
+                                          width: 24,
+                                          height: 24,
+                                          padding: const EdgeInsets.all(2.0),
+                                          child:
+                                              const CircularProgressIndicator(
+                                                strokeWidth: 3,
+                                                valueColor:
+                                                    AlwaysStoppedAnimation<
+                                                      Color
+                                                    >(Colors.blue),
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.g_mobiledata,
+                                          size: 24,
+                                          color: Colors.blue,
+                                        ),
+                                  label: Text(
+                                    _isLoading
+                                        ? 'Signing in...'
+                                        : 'Sign in with Google',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              const Text(
+                                'Please use your UPM email to sign in',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const ViewerDashboardScreen(),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Access Shared Links',
+                                  style: TextStyle(
+                                    color: Colors.blue,
+                                    fontSize: 16,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            authService.error!,
-                            style: TextStyle(color: Colors.red[700]),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
-                  // 切换登录/注册模式
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _isLogin = !_isLogin;
-                        _formKey.currentState?.reset();
-                        authService.clearError();
-                      });
-                    },
-                    child: Text(_isLogin ? '没有账户？点击注册' : '已有账户？点击登录'),
+                      const Text(
+                        '© 2025 Digital Certificate Repository Project',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                    ],
                   ),
-
-                  // 忘记密码链接
-                  if (_isLogin) ...[
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _showForgotPasswordDialog,
-                      child: const Text('忘记密码？'),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  void _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  Future<void> _handleGoogleSignIn(BuildContext context) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final success = await authService.signInWithGoogle();
+
+    if (success == true && mounted) {
+      // Navigation will be handled in the main file
     }
-
-    final authService = context.read<AuthService>();
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    bool success;
-    if (_isLogin) {
-      success = await authService.signIn(email, password);
-    } else {
-      // 注册时需要确认密码
-      final confirmPassword = await _showConfirmPasswordDialog();
-      if (confirmPassword == null) return;
-
-      success = await authService.signUp(email, password, confirmPassword);
-    }
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isLogin ? '登录成功！' : '注册成功！'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  Future<String?> _showConfirmPasswordDialog() async {
-    final confirmPasswordController = TextEditingController();
-
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('确认密码'),
-        content: TextFormField(
-          controller: confirmPasswordController,
-          obscureText: true,
-          decoration: const InputDecoration(
-            labelText: '请再次输入密码',
-            border: OutlineInputBorder(),
-          ),
-          validator: (value) => Validators.validateConfirmPassword(
-            value,
-            _passwordController.text,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final password = confirmPasswordController.text;
-              final error = Validators.validateConfirmPassword(
-                password,
-                _passwordController.text,
-              );
-
-              if (error == null) {
-                Navigator.of(context).pop(password);
-              }
-            },
-            child: const Text('确认'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showForgotPasswordDialog() {
-    final emailController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('重置密码'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('请输入您的邮箱地址，我们将发送重置密码的链接。'),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: '邮箱地址',
-                border: OutlineInputBorder(),
-              ),
-              validator: Validators.validateEmail,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              final error = Validators.validateEmail(email);
-
-              if (error == null) {
-                Navigator.of(context).pop();
-                final authService = context.read<AuthService>();
-                final success = await authService.resetPassword(email);
-
-                if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('重置密码邮件已发送，请检查您的邮箱'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('发送'),
-          ),
-        ],
-      ),
-    );
   }
 }

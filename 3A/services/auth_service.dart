@@ -1,260 +1,208 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 
-/// 认证服务
 class AuthService extends ChangeNotifier {
-  User? _currentUser;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  UserModel? _currentUser;
   bool _isLoading = false;
-  String? _error;
+  bool _isLoggedIn = false;
 
-  // Getters
-  User? get currentUser => _currentUser;
-  bool get isLoggedIn => _currentUser != null;
   bool get isLoading => _isLoading;
-  String? get error => _error;
+  bool get isLoggedIn => _isLoggedIn;
+  UserModel? get currentUser => _currentUser;
 
-  /// 用户登录
-  Future<bool> signIn(String email, String password) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(seconds: 1));
-
-      // 模拟验证逻辑
-      if (email.isEmpty || password.isEmpty) {
-        throw Exception('邮箱和密码不能为空');
-      }
-
-      if (!email.contains('@')) {
-        throw Exception('请输入有效的邮箱地址');
-      }
-
-      if (password.length < 6) {
-        throw Exception('密码长度至少6位');
-      }
-
-      // 模拟登录成功
-      _currentUser = User(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        email: email,
-        role: 'user',
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-        updatedAt: DateTime.now(),
-        name: email.split('@')[0],
-      );
-
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError('登录失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
+  AuthService() {
+    _auth.authStateChanges().listen(_onAuthStateChanged);
   }
 
-  /// 用户注册
-  Future<bool> signUp(
-    String email,
-    String password,
-    String confirmPassword,
-  ) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(seconds: 1));
-
-      // 模拟验证逻辑
-      if (email.isEmpty || password.isEmpty) {
-        throw Exception('邮箱和密码不能为空');
-      }
-
-      if (!email.contains('@')) {
-        throw Exception('请输入有效的邮箱地址');
-      }
-
-      if (password.length < 6) {
-        throw Exception('密码长度至少6位');
-      }
-
-      if (password != confirmPassword) {
-        throw Exception('两次输入的密码不一致');
-      }
-
-      // 模拟注册成功
-      _currentUser = User(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        email: email,
-        role: 'user',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        name: email.split('@')[0],
-      );
-
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _setError('注册失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 用户登出
-  Future<void> signOut() async {
-    _setLoading(true);
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(milliseconds: 500));
-
+  Future<void> _onAuthStateChanged(User? user) async {
+    _isLoading = true;
+    notifyListeners();
+    if (user == null) {
       _currentUser = null;
+      _isLoggedIn = false;
+    } else {
+      // Read role from database
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      String role = 'viewer';
+      if (userDoc.exists) {
+        role = userDoc.data()?['role'] ?? 'viewer';
+        if (role == 'client') {
+          final profileDoc = await _firestore
+              .collection('client_profiles')
+              .doc(user.uid)
+              .get();
+          if (!profileDoc.exists) {
+            await _firestore.collection('client_profiles').doc(user.uid).set({
+              'email': user.email,
+              'displayName': user.displayName,
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+      _currentUser = UserModel(
+        id: user.uid,
+        uid: user.uid,
+        email: user.email ?? '',
+        displayName: user.displayName,
+        photoUrl: user.photoURL,
+        role: role,
+      );
+      _isLoggedIn = true;
+    }
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  // Google Sign-In
+  Future<bool> signInWithGoogle() async {
+    try {
+      _isLoading = true;
       notifyListeners();
-    } catch (e) {
-      _setError('登出失败: $e');
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 重置密码
-  Future<bool> resetPassword(String email) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (email.isEmpty || !email.contains('@')) {
-        throw Exception('请输入有效的邮箱地址');
-      }
-
-      // 模拟发送重置邮件
-      return true;
-    } catch (e) {
-      _setError('重置密码失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 更新用户信息
-  Future<bool> updateUserInfo(User updatedUser) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      _currentUser = updatedUser.copyWith(updatedAt: DateTime.now());
-      notifyListeners();
-
-      return true;
-    } catch (e) {
-      _setError('更新用户信息失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 修改密码
-  Future<bool> changePassword(
-    String currentPassword,
-    String newPassword,
-  ) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (currentPassword.isEmpty || newPassword.isEmpty) {
-        throw Exception('密码不能为空');
-      }
-
-      if (newPassword.length < 6) {
-        throw Exception('新密码长度至少6位');
-      }
-
-      // 模拟密码修改成功
-      return true;
-    } catch (e) {
-      _setError('修改密码失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 删除账户
-  Future<bool> deleteAccount(String password) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // 模拟API调用
-      await Future.delayed(const Duration(seconds: 1));
-
-      if (password.isEmpty) {
-        throw Exception('请输入密码确认删除');
-      }
-
-      // 模拟账户删除成功
-      _currentUser = null;
-      notifyListeners();
-
-      return true;
-    } catch (e) {
-      _setError('删除账户失败: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// 检查用户权限
-  bool hasPermission(String permission) {
-    if (_currentUser == null) return false;
-
-    switch (permission) {
-      case 'admin':
-        return _currentUser!.isAdmin;
-      case 'manager':
-        return _currentUser!.isAdmin || _currentUser!.isManager;
-      case 'user':
-        return true;
-      default:
+      print('Starting Google Sign In process...');
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        print('Google Sign In was cancelled by user');
         return false;
+      }
+      print('Google Sign In successful for: ${googleUser.email}');
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+      print('Got authentication tokens');
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      print('Signing in to Firebase with Google credential...');
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = userCredential.user;
+      if (user == null) {
+        print('Firebase sign in failed - no user returned');
+        return false;
+      }
+      print('Firebase sign in successful for: ${user.email}');
+      // Check if user exists in Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      if (!userDoc.exists) {
+        print('Creating new user in Firestore');
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'email': user.email,
+          'displayName': user.displayName,
+          'photoURL': user.photoURL,
+          'role': 'recipient',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        print('User already exists in Firestore');
+      }
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
+        {'lastLoginAt': FieldValue.serverTimestamp()},
+      );
+      final updatedUserDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final actualRole = updatedUserDoc.data()?['role'] ?? 'recipient';
+      _currentUser = UserModel(
+        id: user.uid,
+        uid: user.uid,
+        email: user.email!,
+        displayName: user.displayName ?? '',
+        photoUrl: user.photoURL,
+        role: actualRole,
+      );
+      _isLoggedIn = true;
+      notifyListeners();
+      print('Google Sign In process completed successfully');
+      return true;
+    } catch (e) {
+      print('Error signing in with Google: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  // 私有方法
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
+  // Sign out
+  Future<void> signOut() async {
+    try {
+      await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
+    } catch (e) {
+      print('Error signing out: $e');
+      rethrow;
+    }
   }
 
-  void _setError(String error) {
-    _error = error;
-    notifyListeners();
+  // Get user role
+  Future<UserRole?> getUserRole(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (doc.exists) {
+        // Read role from database
+        final role = doc.data()?['role'] as String?;
+        return _stringToRole(role);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user role: $e');
+      return null;
+    }
   }
 
-  void _clearError() {
-    _error = null;
+  // Update user role
+  Future<void> updateUserRole(String userId, UserRole newRole) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'role': newRole.toString().split('.').last,
+      });
+
+      // Add log entry
+      await _firestore.collection('logs').add({
+        'action': 'role_created',
+        'userId': userId,
+        'newRole': newRole.toString().split('.').last,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error updating user role: $e');
+      rethrow;
+    }
   }
 
-  /// 清除错误信息
-  void clearError() {
-    _clearError();
+  UserRole _stringToRole(String? role) {
+    if (role == null) {
+      return UserRole.viewer;
+    }
+
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return UserRole.admin;
+      case 'ca':
+      case 'certificateauthority':
+        return UserRole.certificateAuthority;
+      case 'recipient':
+        return UserRole.recipient;
+      case 'client':
+        return UserRole.client;
+      case 'viewer':
+        return UserRole.viewer;
+      default:
+        return UserRole.viewer;
+    }
   }
 }

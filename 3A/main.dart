@@ -1,43 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 import 'services/auth_service.dart';
-import 'services/user_service.dart';
+import 'services/role_service.dart';
+import 'services/certificate_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/user_profile_screen.dart';
+import 'screens/role_management_screen.dart';
+import 'screens/dashboard_screen.dart';
+import 'screens/certificate_management_screen.dart';
 import 'models/user_model.dart';
-import 'utils/validators.dart';
-import 'utils/constants.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     }
   } catch (e) {
     print('Firebase initialization error: $e');
   }
 
-  runApp(const UserManagementApp());
+  runApp(const MyApp());
 }
 
-class UserManagementApp extends StatelessWidget {
-  const UserManagementApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthService()),
-        ChangeNotifierProvider(create: (_) => UserService()),
+        ChangeNotifierProvider(create: (_) => RoleService()),
+        ChangeNotifierProvider(create: (_) => CertificateService()),
       ],
       child: MaterialApp(
-        title: '用户管理系统',
+        title: 'Digital Certificate Repository - Auth & Role Management',
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
           useMaterial3: true,
         ),
         home: const AuthWrapper(),
@@ -59,7 +64,7 @@ class AuthWrapper extends StatelessWidget {
           );
         }
         if (authService.isLoggedIn) {
-          return const UserProfileScreen();
+          return const HomePage();
         }
         return const LoginScreen();
       },
@@ -67,8 +72,15 @@ class AuthWrapper extends StatelessWidget {
   }
 }
 
-class UserProfileScreen extends StatelessWidget {
-  const UserProfileScreen({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +93,7 @@ class UserProfileScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('用户资料'),
+            title: const Text('Auth & Role Management'),
             actions: [
               IconButton(
                 icon: const Icon(Icons.logout),
@@ -89,175 +101,41 @@ class UserProfileScreen extends StatelessWidget {
               ),
             ],
           ),
-          body: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Text(user.email[0].toUpperCase()),
-                    ),
-                    title: Text(user.email),
-                    subtitle: Text('用户ID: ${user.id}'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  child: Column(
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.email),
-                        title: const Text('邮箱'),
-                        subtitle: Text(user.email),
-                        trailing: const Icon(Icons.edit),
-                        onTap: () => _showEditEmailDialog(context, user),
-                      ),
-                      const Divider(),
-                      ListTile(
-                        leading: const Icon(Icons.security),
-                        title: const Text('修改密码'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () => _showChangePasswordDialog(context),
-                      ),
-                      const Divider(),
-                      ListTile(
-                        leading: const Icon(Icons.delete),
-                        title: const Text('删除账户'),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () =>
-                            _showDeleteAccountDialog(context, authService),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          body: _buildBody(),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            onTap: (index) => setState(() => _selectedIndex = index),
+            type: BottomNavigationBarType.fixed,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.people),
+                label: 'Role Management',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.security),
+                label: 'Certificates',
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  void _showEditEmailDialog(BuildContext context, User user) {
-    final emailController = TextEditingController(text: user.email);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('修改邮箱'),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            labelText: '新邮箱地址',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: 实现邮箱修改逻辑
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('邮箱修改功能待实现')));
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showChangePasswordDialog(BuildContext context) {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('修改密码'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '当前密码',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: newPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '新密码',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: confirmPasswordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: '确认新密码',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: 实现密码修改逻辑
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('密码修改功能待实现')));
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteAccountDialog(BuildContext context, AuthService authService) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除账户'),
-        content: const Text('确定要删除您的账户吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: 实现账户删除逻辑
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('账户删除功能待实现')));
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return const DashboardScreen();
+      case 1:
+        return const RoleManagementScreen();
+      case 2:
+        return const CertificateManagementScreen();
+      default:
+        return const DashboardScreen();
+    }
   }
 }

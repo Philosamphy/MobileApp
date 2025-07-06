@@ -1,7 +1,7 @@
 /// 应用常量定义
 class AppConstants {
   // 应用信息
-  static const String appName = '用户管理系统';
+  static const String appName = '数字证书管理系统';
   static const String appVersion = '1.0.0';
 
   // 用户角色
@@ -15,16 +15,29 @@ class AppConstants {
   static const int permissionDelete = 4;
   static const int permissionAdmin = 8;
 
+  // 证书状态
+  static const String statusActive = 'active';
+  static const String statusExpired = 'expired';
+  static const String statusRevoked = 'revoked';
+  static const String statusPending = 'pending';
+
+  // 证书类型
+  static const String certTypeSSL = 'ssl';
+  static const String certTypeCodeSigning = 'code_signing';
+  static const String certTypeEmail = 'email';
+  static const String certTypeClient = 'client';
+
   // 颜色主题
-  static const int primaryColor = 0xFF4CAF50;
-  static const int secondaryColor = 0xFF388E3C;
-  static const int accentColor = 0xFF8BC34A;
+  static const int primaryColor = 0xFF2196F3;
+  static const int secondaryColor = 0xFF1976D2;
+  static const int accentColor = 0xFF03A9F4;
 
   // 文本常量
   static const String loginTitle = '登录';
   static const String registerTitle = '注册';
-  static const String userProfileTitle = '用户资料';
-  static const String userManagementTitle = '用户管理';
+  static const String dashboardTitle = '仪表板';
+  static const String roleManagementTitle = '角色管理';
+  static const String certificateManagementTitle = '证书管理';
 
   // 错误消息
   static const String errorNetwork = '网络连接错误';
@@ -44,11 +57,23 @@ class AppConstants {
   static const int minUsernameLength = 3;
   static const int maxUsernameLength = 20;
 
+  // API 端点
+  static const String apiBaseUrl = 'https://your-api-domain.com/api';
+  static const String apiAuth = '/auth';
+  static const String apiUsers = '/users';
+  static const String apiRoles = '/roles';
+  static const String apiCertificates = '/certificates';
+
   // 本地存储键
   static const String keyUserToken = 'user_token';
   static const String keyUserData = 'user_data';
   static const String keyAppSettings = 'app_settings';
   static const String keyThemeMode = 'theme_mode';
+
+  // 文件路径
+  static const String assetsImages = 'assets/images/';
+  static const String assetsIcons = 'assets/icons/';
+  static const String assetsFonts = 'assets/fonts/';
 
   // 日期格式
   static const String dateFormat = 'yyyy-MM-dd';

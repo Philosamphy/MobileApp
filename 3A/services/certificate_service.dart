@@ -1,143 +1,251 @@
-import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:uuid/uuid.dart';
-import '../models/document_model.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_firestore/firebase_firestore.dart';
+import '../models/certificate_model.dart';
+import '../utils/constants.dart';
 
-class CertificateService {
+/// 证书管理服务
+class CertificateService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
-  final _uuid = Uuid();
 
-  // Get all certificates
-  Future<List<DocumentModel>> getAllCertificates() async {
+  List<Certificate> _certificates = [];
+  bool _isLoading = false;
+  String? _error;
+
+  // Getters
+  List<Certificate> get certificates => _certificates;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
+
+  /// 获取所有证书
+  Future<void> fetchCertificates() async {
+    _setLoading(true);
+    _clearError();
+
     try {
-      final querySnapshot = await _firestore.collection('certificates').get();
-      return querySnapshot.docs
-          .map((doc) => DocumentModel.fromMap(doc.data()))
+      final querySnapshot = await _firestore
+          .collection('certificates')
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      _certificates = querySnapshot.docs
+          .map((doc) => Certificate.fromJson({'id': doc.id, ...doc.data()}))
           .toList();
     } catch (e) {
-      print('Error getting certificates: $e');
-      return [];
+      _setError('获取证书列表失败: $e');
+    } finally {
+      _setLoading(false);
     }
   }
 
-  // Get certificate by ID
-  Future<DocumentModel?> getCertificateById(String id) async {
+  /// 根据ID获取证书
+  Future<Certificate?> getCertificateById(String id) async {
     try {
       final doc = await _firestore.collection('certificates').doc(id).get();
       if (doc.exists) {
-        return DocumentModel.fromMap(doc.data()!);
+        return Certificate.fromJson({'id': doc.id, ...doc.data()!});
       }
       return null;
     } catch (e) {
-      print('Error getting certificate: $e');
+      _setError('获取证书详情失败: $e');
       return null;
     }
   }
 
-  // Create new certificate
-  Future<String?> createCertificate(DocumentModel certificate) async {
+  /// 创建新证书
+  Future<bool> createCertificate(Certificate certificate) async {
+    _setLoading(true);
+    _clearError();
+
     try {
       final docRef = await _firestore
           .collection('certificates')
-          .add(certificate.toMap());
-      return docRef.id;
+          .add(certificate.toJson());
+
+      // 添加到本地列表
+      final newCertificate = certificate.copyWith(id: docRef.id);
+      _certificates.insert(0, newCertificate);
+
+      notifyListeners();
+      return true;
     } catch (e) {
-      print('Error creating certificate: $e');
-      return null;
+      _setError('创建证书失败: $e');
+      return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
-  Future<void> updateCertificate(DocumentModel certificate) async {
+  /// 更新证书
+  Future<bool> updateCertificate(Certificate certificate) async {
+    _setLoading(true);
+    _clearError();
+
     try {
       await _firestore
           .collection('certificates')
           .doc(certificate.id)
-          .update(certificate.toMap());
-    } catch (e) {
-      print('Error updating certificate: $e');
-      rethrow;
-    }
-  }
+          .update(certificate.toJson());
 
-  // Update certificate
-  Future<bool> updateCertificateStatus(String id, String status) async {
-    try {
-      await _firestore.collection('certificates').doc(id).update({
-        'status': status,
-      });
+      // 更新本地列表
+      final index = _certificates.indexWhere((c) => c.id == certificate.id);
+      if (index != -1) {
+        _certificates[index] = certificate;
+        notifyListeners();
+      }
+
       return true;
     } catch (e) {
-      print('Error updating certificate status: $e');
+      _setError('更新证书失败: $e');
       return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
-  // Delete certificate
+  /// 删除证书
   Future<bool> deleteCertificate(String id) async {
-    try {
-      // Delete stored files
-      final doc = await _firestore.collection('certificates').doc(id).get();
-      if (doc.exists) {
-        final data = doc.data()!;
-        if (data['certificateUrl'] != null) {
-          // TODO: Delete file from storage
-        }
-        if (data['signatureUrl'] != null) {
-          // TODO: Delete file from storage
-        }
-      }
+    _setLoading(true);
+    _clearError();
 
-      // Delete Firestore document
+    try {
       await _firestore.collection('certificates').doc(id).delete();
+
+      // 从本地列表移除
+      _certificates.removeWhere((c) => c.id == id);
+      notifyListeners();
+
       return true;
     } catch (e) {
-      print('Error deleting certificate: $e');
+      _setError('删除证书失败: $e');
       return false;
+    } finally {
+      _setLoading(false);
     }
   }
 
-  // Update certificate file URL
-  Future<bool> updateCertificateFileUrl(String id, String fileUrl) async {
-    try {
-      await _firestore.collection('certificates').doc(id).update({
-        'certificateUrl': fileUrl,
-      });
-      return true;
-    } catch (e) {
-      print('Error updating certificate file URL: $e');
-      return false;
-    }
+  /// 根据状态筛选证书
+  List<Certificate> getCertificatesByStatus(String status) {
+    return _certificates.where((cert) => cert.status == status).toList();
   }
 
-  // Get certificate by share token
-  Future<DocumentModel?> getCertificateByShareToken(String token) async {
+  /// 根据类型筛选证书
+  List<Certificate> getCertificatesByType(String type) {
+    return _certificates.where((cert) => cert.type == type).toList();
+  }
+
+  /// 获取即将过期的证书（30天内）
+  List<Certificate> getExpiringCertificates() {
+    return _certificates.where((cert) => cert.isExpiringSoon).toList();
+  }
+
+  /// 获取已过期的证书
+  List<Certificate> getExpiredCertificates() {
+    return _certificates.where((cert) => cert.isExpired).toList();
+  }
+
+  /// 搜索证书
+  List<Certificate> searchCertificates(String query) {
+    if (query.isEmpty) return _certificates;
+
+    final lowercaseQuery = query.toLowerCase();
+    return _certificates.where((cert) {
+      return cert.name.toLowerCase().contains(lowercaseQuery) ||
+          cert.subject.toLowerCase().contains(lowercaseQuery) ||
+          cert.issuer.toLowerCase().contains(lowercaseQuery) ||
+          cert.serialNumber.toLowerCase().contains(lowercaseQuery) ||
+          (cert.description?.toLowerCase().contains(lowercaseQuery) ?? false);
+    }).toList();
+  }
+
+  /// 获取证书统计信息
+  Map<String, int> getCertificateStats() {
+    final stats = <String, int>{};
+
+    // 按状态统计
+    for (final cert in _certificates) {
+      stats[cert.status] = (stats[cert.status] ?? 0) + 1;
+    }
+
+    // 按类型统计
+    final typeStats = <String, int>{};
+    for (final cert in _certificates) {
+      typeStats[cert.type] = (typeStats[cert.type] ?? 0) + 1;
+    }
+
+    return {
+      'total': _certificates.length,
+      'active': stats[AppConstants.statusActive] ?? 0,
+      'expired': stats[AppConstants.statusExpired] ?? 0,
+      'revoked': stats[AppConstants.statusRevoked] ?? 0,
+      'pending': stats[AppConstants.statusPending] ?? 0,
+      'expiringSoon': getExpiringCertificates().length,
+      'ssl': typeStats[AppConstants.certTypeSSL] ?? 0,
+      'codeSigning': typeStats[AppConstants.certTypeCodeSigning] ?? 0,
+      'email': typeStats[AppConstants.certTypeEmail] ?? 0,
+      'client': typeStats[AppConstants.certTypeClient] ?? 0,
+    };
+  }
+
+  /// 批量更新证书状态
+  Future<bool> batchUpdateStatus(
+    List<String> certificateIds,
+    String newStatus,
+  ) async {
+    _setLoading(true);
+    _clearError();
+
     try {
-      final querySnapshot = await _firestore
-          .collection('certificates')
-          .where('shareToken', isEqualTo: token)
-          .limit(1)
-          .get();
-      if (querySnapshot.docs.isNotEmpty) {
-        final doc = querySnapshot.docs.first;
-        final certificate = DocumentModel.fromMap(doc.data());
+      final batch = _firestore.batch();
 
-        if (certificate.shareTokenCreatedAt != null) {
-          final now = DateTime.now();
-          final tokenAge = now.difference(certificate.shareTokenCreatedAt!);
-          if (tokenAge.inDays >= 10) {
-            // Token has expired
-            return null;
-          }
-        }
-
-        return certificate;
+      for (final id in certificateIds) {
+        final docRef = _firestore.collection('certificates').doc(id);
+        batch.update(docRef, {
+          'status': newStatus,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
       }
-      return null;
+
+      await batch.commit();
+
+      // 更新本地列表
+      for (final id in certificateIds) {
+        final index = _certificates.indexWhere((c) => c.id == id);
+        if (index != -1) {
+          final cert = _certificates[index];
+          _certificates[index] = cert.copyWith(
+            status: newStatus,
+            updatedAt: DateTime.now(),
+          );
+        }
+      }
+
+      notifyListeners();
+      return true;
     } catch (e) {
-      print('Error getting certificate by share token: $e');
-      return null;
+      _setError('批量更新状态失败: $e');
+      return false;
+    } finally {
+      _setLoading(false);
     }
+  }
+
+  // 私有方法
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  void _setError(String error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  void _clearError() {
+    _error = null;
+  }
+
+  /// 清除错误信息
+  void clearError() {
+    _clearError();
   }
 }
